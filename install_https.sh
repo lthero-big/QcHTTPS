@@ -29,39 +29,11 @@ log_CYAN() {
     echo -e "${CYAN}$1${RESET}"
 }
 
-# 检查是否以root权限运行
-if [ "$EUID" -ne 0 ]; then
-  log_RED "请以root权限运行此脚本。"
-  exit 1
-fi
-
-# 检查并安装必要的软件包
-install_if_missing() {
-  PACKAGE_NAME=$1
-  if ! dpkg -l | grep -q "^ii  $PACKAGE_NAME "; then
-    log_YELLOW "$PACKAGE_NAME 未安装，正在安装..."
-    sudo apt install -y $PACKAGE_NAME
-  else
-    log_GREEN "$PACKAGE_NAME 已安装。"
-  fi
-}
-
-# 检查自动续订任务是否存在
-setup_cron_job() {
-  CRON_JOB="0 0 1 * * /usr/bin/certbot renew --deploy-hook 'nginx -s reload'"
-  if crontab -l 2>/dev/null | grep -q "$CRON_JOB"; then
-    log_GREEN "证书自动续订任务已存在。"
-  else
-    log_YELLOW "配置证书自动续订任务..."
-    (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
-    log_GREEN "证书自动续订任务已添加。"
-  fi
-}
-
 REMOTE_SCRIPT_URL="https://raw.githubusercontent.com/lthero-big/QcHTTPS/refs/heads/main/install_https.sh"
 # 脚本信息
 SCRIPT_VERSION="V_1.0.0"
-# 更新脚本功能
+
+# 更新脚本
 update_script() {
   echo -e "${GREEN}正在检查脚本更新...${RESET}"
   # 设置超时时间为 10 秒
@@ -93,6 +65,35 @@ update_script() {
 }
 
 update_script
+
+# 检查是否以root权限运行
+if [ "$EUID" -ne 0 ]; then
+  log_RED "请以root权限运行此脚本。"
+  exit 1
+fi
+
+# 检查并安装必要的软件包
+install_if_missing() {
+  PACKAGE_NAME=$1
+  if ! dpkg -l | grep -q "^ii  $PACKAGE_NAME "; then
+    log_YELLOW "$PACKAGE_NAME 未安装，正在安装..."
+    sudo apt install -y $PACKAGE_NAME
+  else
+    log_GREEN "$PACKAGE_NAME 已安装。"
+  fi
+}
+
+# 检查自动续订任务是否存在
+setup_cron_job() {
+  CRON_JOB="0 0 1 * * /usr/bin/certbot renew --deploy-hook 'nginx -s reload'"
+  if crontab -l 2>/dev/null | grep -q "$CRON_JOB"; then
+    log_GREEN "证书自动续订任务已存在。"
+  else
+    log_YELLOW "配置证书自动续订任务..."
+    (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
+    log_GREEN "证书自动续订任务已添加。"
+  fi
+}
 
 # 菜单功能
 log_BLUE "请选择操作:"
