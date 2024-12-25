@@ -58,12 +58,49 @@ setup_cron_job() {
   fi
 }
 
+REMOTE_SCRIPT_URL="https://raw.githubusercontent.com/lthero-big/QcHTTPS/refs/heads/main/install_https.sh"
+# 脚本信息
+SCRIPT_VERSION="V_1.0.0"
+# 更新脚本功能
+update_script() {
+  echo -e "${GREEN}正在检查脚本更新...${RESET}"
+  # 设置超时时间为 10 秒
+  REMOTE_VERSION=$(curl --max-time 10 -fsSL "$REMOTE_SCRIPT_URL" | grep -E "^SCRIPT_VERSION=" | cut -d'"' -f2)
+  # 检查是否成功获取远程版本
+  if [ $? -ne 0 ]; then
+    log_YELLOW "无法获取到最新版本 (超时或网络问题)."
+    return
+  fi
+
+  if [ "$REMOTE_VERSION" != "$SCRIPT_VERSION" ]; then
+    log_GREEN "发现新版本 ($REMOTE_VERSION) ，当前版本 $SCRIPT_VERSION."
+    log_GREEN "是否更新脚本? (y/N)"
+    read update_choice
+    if [[ "$update_choice" == "y" || "$update_choice" == "Y" ]]; then
+      log_GREEN "Updating script..."
+      curl --max-time 10 -fsSL "$REMOTE_SCRIPT_URL" -o "$0"
+      if [ $? -eq 0 ]; then
+        chmod +x "$0"
+        log_GREEN "脚本已经更新为 $REMOTE_VERSION. 请重新运行脚本."
+        exit 0
+      else
+        log_RED "脚本更新失败."
+      fi
+    fi
+  else
+    log_GREEN "当前脚本已为最新版本: $SCRIPT_VERSION."
+  fi
+}
+
+update_script
+
 # 菜单功能
 log_BLUE "请选择操作:"
 log_CYAN "1. 配置 HTTPS"
 log_CYAN "2. 查看当前启用的 Nginx 配置"
+log_CYAN "3. 更新脚本"
 log_CYAN "q. 退出脚本"
-read -p "请输入选项 (1/2/q): " CHOICE
+read -p "请输入选项 (1/2/3/q): " CHOICE
 
 case $CHOICE in
   1)
@@ -136,13 +173,17 @@ EOF
       realpath "$file"
     done
     ;;
+  3)
+    # 更新脚本
+    update_script
+    ;;
   q)
     # 退出脚本
     log_GREEN "退出脚本。"
     exit 0
     ;;
   *)
-    log_RED "无效选项，请重新运行脚本并选择 1, 2 或 q。"
+    log_RED "无效选项，请重新运行脚本并选择 1, 2, 3 或 q。"
     exit 1
     ;;
 esac
