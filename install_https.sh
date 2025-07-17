@@ -106,8 +106,12 @@ read -p "请输入选项 (1/2/3/q): " CHOICE
 case $CHOICE in
   1)
     # 获取用户输入
-    read -p "请输入域名 (例如: xx.lthero.cn): " DOMAIN
-    read -p "请输入本地服务器端口号 (例如: 3001): " PORT
+    log_BLUE "请选择部署类型："
+    log_CYAN "1. 通过端口代理 (如 Node/Docker 服务)"
+    log_CYAN "2. 通过本地文件目录 (如静态网站)"
+    read -p "请输入选择 (1/2): " DEPLOY_TYPE
+    
+    read -p "请输入域名 (例如: xx.xxx.cn): " DOMAIN
     read -p "请输入用于申请证书的邮箱地址: " EMAIL
 
     # 更新系统包
@@ -124,7 +128,9 @@ case $CHOICE in
     NGINX_CONFIG="/etc/nginx/sites-available/$DOMAIN"
     NGINX_ENABLED="/etc/nginx/sites-enabled/$DOMAIN"
 
-    cat <<EOF > $NGINX_CONFIG
+    if [ "$DEPLOY_TYPE" == "1" ]; then
+      read -p "请输入本地服务器端口号 (例如: 3001): " PORT
+      cat <<EOF > $NGINX_CONFIG
 server {
     listen 80;
     server_name $DOMAIN;
@@ -139,32 +145,46 @@ server {
     }
 }
 EOF
+    elif [ "$DEPLOY_TYPE" == "2" ]; then
+      read -p "请输入网站根目录路径 (例如: /www/wwwroot/xxx.xxx.com): " ROOT_PATH
+      cat <<EOF > $NGINX_CONFIG
+server {
+    listen 80;
+    server_name $DOMAIN;
 
-    # 启用配置
-    ln -s $NGINX_CONFIG $NGINX_ENABLED
+    root $ROOT_PATH;
+    index index.html index.htm;
 
-    # 检查Nginx配置并重新加载
+    location / {
+        try_files \$uri \$uri/ =404;
+    }
+}
+EOF
+    else
+      log_RED "无效的部署类型选择，请输入 1 或 2。"
+      exit 1
+    fi
+
+    ln -sf $NGINX_CONFIG $NGINX_ENABLED
     nginx -t
     if [ $? -ne 0 ]; then
-      log_RED "Nginx配置有误，请检查！"
+      log_RED "Nginx 配置有误，请检查。"
       exit 1
     fi
     sudo systemctl reload nginx
-
     # 申请并配置SSL证书
     certbot --nginx -d $DOMAIN --email $EMAIL --agree-tos --non-interactive --redirect
     if [ $? -ne 0 ]; then
-      log_RED "证书申请失败，请检查域名和DNS设置。"
+      log_RED "证书申请失败，请检查域名和 DNS 设置。"
       exit 1
     fi
     log_GREEN "证书申请成功，证书位置于 /etc/letsencrypt/live/"
-
     # 配置自动续订
     setup_cron_job
-
     # 完成
-    log_GREEN "HTTPS配置完成！现在可以通过 https://$DOMAIN 访问您的服务。"
+    log_GREEN "HTTPS 配置完成！现在可以通过 https://$DOMAIN 访问您的服务。"
     ;;
+
   2)
     # 查看当前启用的 Nginx 配置
     log_CYAN "当前启用的 Nginx 配置文件:"
